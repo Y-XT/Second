@@ -70,11 +70,7 @@ class UAVid2020TripletJsonDataset(BaseTripletDataset):
                  use_triplet_pose: bool = False,
                  use_vggt_depth: bool = False,
                  triplet_manifest_glob: str = "triplets.jsonl",
-                 k_region: str = "auto",
-                 use_external_mask: bool = False,
-                 external_mask_dir: str = "mask",
-                 external_mask_ext: str = ".png",
-                 external_mask_thresh: float = 0.5):
+                 k_region: str = "auto"):
 
         default_k_4x4, k_source = self._choose_default_k(k_region, data_path, triplet_root)
         if k_source == "default" and (k_region or "auto").strip().lower() == "auto":
@@ -102,10 +98,6 @@ class UAVid2020TripletJsonDataset(BaseTripletDataset):
             use_triplet_pose=use_triplet_pose,
             use_vggt_depth=use_vggt_depth,
             triplet_manifest_glob=triplet_manifest_glob,
-            use_external_mask=use_external_mask,
-            external_mask_dir=external_mask_dir,
-            external_mask_ext=external_mask_ext,
-            external_mask_thresh=external_mask_thresh,
         )
 
     def _infer_depth_path_from_center(self, center_path: str):

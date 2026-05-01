@@ -79,11 +79,7 @@ class BaseTripletDataset(MonoDataset):
                  norm_source_prefix: str = "color_aug",
                  norm_target_prefix: str = "color_norm",
                  use_triplet_pose: bool = False,
-                 use_vggt_depth: bool = False,
-                 use_external_mask: bool = False,
-                 external_mask_dir: str = "mask",
-                 external_mask_ext: str = ".png",
-                 external_mask_thresh: float = 0.5):
+                 use_vggt_depth: bool = False):
 
         self._depth_exts = ('.npy', '.npz', '.png', '.tif', '.tiff', '.exr')
         self._depth_path_cache: Dict[str, Optional[str]] = {}
@@ -137,24 +133,6 @@ class BaseTripletDataset(MonoDataset):
         self._norm_source_prefix = norm_source_prefix
         self._norm_target_prefix = norm_target_prefix
 
-        self.to_tensor = transforms.ToTensor()
-        self.use_external_mask = bool(use_external_mask)
-        self.external_mask_dir = str(external_mask_dir or "mask")
-        self.external_mask_ext = str(external_mask_ext or ".png")
-        self.external_mask_thresh = float(external_mask_thresh)
-        self._missing_mask_logged = False
-        self._mask_path_cache: Dict[str, Optional[str]] = {}
-        if hasattr(Image, 'Resampling'):
-            mask_interp = Image.Resampling.NEAREST
-        else:
-            mask_interp = Image.NEAREST
-        self._mask_resize = {}
-        for i in range(self.num_scales):
-            s = 2 ** i
-            self._mask_resize[i] = transforms.Resize(
-                (self.height // s, self.width // s),
-                interpolation=mask_interp,
-            )
         self.samples: List[Dict] = self._load_all_triplets(self.triplets_root)
         self.load_depth = self._probe_depth_availability()
 
@@ -371,20 +349,6 @@ class BaseTripletDataset(MonoDataset):
             inputs.pop(("color", i, -1), None)
             inputs.pop(("color_aug", i, -1), None)
 
-        if self.use_external_mask:
-            mask_img = self._load_external_mask(center_path, do_flip)
-            if mask_img is not None:
-                for s in range(self.num_scales):
-                    mask_resized = self._mask_resize[s](mask_img)
-                    mask_tensor = self.to_tensor(mask_resized)
-                    keep = (mask_tensor < self.external_mask_thresh).float()
-                    inputs[("mask", 0, s)] = keep
-            else:
-                for s in range(self.num_scales):
-                    h = self.height // (2 ** s)
-                    w = self.width // (2 ** s)
-                    inputs[("mask", 0, s)] = torch.ones(1, h, w, dtype=torch.float32)
-
         self._apply_normalization(inputs)
 
         offset_prev = float(rec["prev_idx"] - rec["center_idx"])
@@ -519,59 +483,6 @@ class BaseTripletDataset(MonoDataset):
         if alt_path.exists():
             return str(alt_path)
         return None
-
-    def _infer_mask_path_from_center(self, center_path: str) -> Optional[str]:
-        if not center_path:
-            return None
-        if center_path in self._mask_path_cache:
-            return self._mask_path_cache[center_path]
-
-        center_p = Path(center_path)
-        seq_dir = center_p.parent.parent if center_p.parent is not None else None
-        if seq_dir is None:
-            self._mask_path_cache[center_path] = None
-            return None
-
-        stem = center_p.stem
-        mask_dir = self.external_mask_dir or "mask"
-        mask_ext = self.external_mask_ext or ".png"
-        candidate = seq_dir / mask_dir / f"{stem}{mask_ext}"
-        self._mask_path_cache[center_path] = str(candidate)
-        return str(candidate)
-
-    def _resolve_mask_path(self, path: Optional[str]) -> Optional[str]:
-        if path and os.path.exists(path):
-            return path
-        if not path:
-            return None
-        p = Path(path)
-        parts = list(p.parts)
-        if "Train" in parts:
-            idx = parts.index("Train")
-            parts[idx] = "Validation"
-        elif "Validation" in parts:
-            idx = parts.index("Validation")
-            parts[idx] = "Train"
-        else:
-            return None
-        alt_path = Path(*parts)
-        if alt_path.exists():
-            return str(alt_path)
-        return None
-
-    def _load_external_mask(self, center_path: str, do_flip: bool):
-        mask_path = self._infer_mask_path_from_center(center_path)
-        mask_path = self._resolve_mask_path(mask_path)
-        if not mask_path or not os.path.exists(mask_path):
-            if not self._missing_mask_logged:
-                print(f"[{self.__class__.__name__}] 警告：未找到 mask 文件 path={mask_path}")
-                self._missing_mask_logged = True
-            return None
-        with Image.open(mask_path) as img:
-            mask_img = img.convert("L")
-        if do_flip:
-            mask_img = mask_img.transpose(Image.FLIP_LEFT_RIGHT)
-        return mask_img
 
     # ------- 深度相关 -------
     def _probe_depth_availability(self) -> bool:
