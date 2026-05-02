@@ -34,9 +34,11 @@ import cv2  # 用于 Edge-F1 与 TIFF 读取
 import sys
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+if not os.path.isdir(os.path.join(PROJECT_ROOT, "methods")):
+    raise RuntimeError(f"Could not locate project root from {CURRENT_DIR}")
 if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)  # 确保可直接 import methods 包
+    sys.path.insert(0, PROJECT_ROOT)  # 确保可直接 import methods / layers 包
 
 from methods import networks
 from layers import disp_to_depth
@@ -512,6 +514,12 @@ def load_model(args: argparse.Namespace, device: torch.device):
         decoder_path = _resolve_ckpt_path(model_path, ['decoder.pth', 'depth.pth'], 'MonoViT.decoder')
         print('Loading MonoViT encoder:', encoder_path)
         print('Loading MonoViT decoder:', decoder_path)
+        if getattr(networks, "DeepNet", None) is None:
+            monovit_import_error = getattr(networks, "_MONOVIT_IMPORT_ERROR", None)
+            raise ModuleNotFoundError(
+                "MonoViT inference requires optional dependencies for methods.networks.monovit "
+                f"(original import error: {monovit_import_error})"
+            ) from monovit_import_error
 
         model = networks.DeepNet(type='mpvitnet')
         encoder = model.encoder

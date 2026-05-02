@@ -48,9 +48,11 @@ import cv2  # 用于 Edge-F1 与视图合成/位姿估计
 import sys
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+if not os.path.isdir(os.path.join(PROJECT_ROOT, "methods")):
+    raise RuntimeError(f"Could not locate project root from {CURRENT_DIR}")
 if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)  # 确保可直接 import methods 包
+    sys.path.insert(0, PROJECT_ROOT)  # 确保可直接 import methods / layers 包
 
 from methods import networks
 from layers import disp_to_depth
@@ -86,9 +88,9 @@ def parse_args() -> argparse.Namespace:
                         help='包含各序列的 GT 与图像根目录')
     parser.add_argument('--output_base', type=str, default='/home/yxt/文档/mono_result/eval',
                         help='输出根目录（会在其中创建 model_name 子目录）')
-    parser.add_argument('--exp_dir', type=str, default='/mnt/data_nvme3n1p1/mono_weights/weights/UAVula_R1/monovit_vggt_rflow_tinj_uavula_tridataset_512x288_bs8_lr1e-04_e40_step20_9id0',
+    parser.add_argument('--exp_dir', type=str, default='/mnt/data_nvme3n1p1/mono_weights/weights/UAVula_R1/monovit_vggt_rflow_tinj_uavula_tridataset_512x288_bs8_lr1e-04_e40_step20_gqa1',
                         help='实验目录：包含 models/weights_x 的根目录')
-    parser.add_argument('--weights', type=str, default='weights_17',
+    parser.add_argument('--weights', type=str, default='weights_27',
                         help="'latest' | 整数（如 7）| 目录名（如 weights_7）")
     parser.add_argument('--model_name', type=str, default='auto',
                         help='模型分支（auto | MonoViT* | MonoDepth2*）')
@@ -518,6 +520,12 @@ def load_model(args: argparse.Namespace, device: torch.device):
         decoder_path = _resolve_ckpt_path(model_path, ["decoder.pth", "depth.pth"], "MonoViT.decoder")
         print("Loading MonoViT encoder from", encoder_path)
         print("Loading MonoViT decoder from", decoder_path)
+        if getattr(networks, "DeepNet", None) is None:
+            monovit_import_error = getattr(networks, "_MONOVIT_IMPORT_ERROR", None)
+            raise ModuleNotFoundError(
+                "MonoViT inference requires optional dependencies for methods.networks.monovit "
+                f"(original import error: {monovit_import_error})"
+            ) from monovit_import_error
         model = networks.DeepNet(type='mpvitnet')
         encoder = model.encoder
         decoder = model.decoder

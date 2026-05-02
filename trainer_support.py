@@ -496,7 +496,9 @@ def log(self, mode, inputs, outputs, losses):
 
             automask = outputs.get(f"identity_selection/{s_main}", None)
             if not self.opt.disable_automasking and torch.is_tensor(automask):
-                wandb.log({f"{mode}/automask_{s_main}_{j}": wandb.Image(automask[j].detach().float().cpu())}, step=self.step)
+                # identity_selection is [B, H, W]; add a channel dim so W&B treats it as an image.
+                automask_img = automask[j].detach().float().cpu().unsqueeze(0)
+                wandb.log({f"{mode}/automask_{s_main}_{j}": wandb.Image(automask_img)}, step=self.step)
     else:
         summary = [f"[Log][{mode}] step={self.step} | loss={loss_value:.6f}"]
         if depth_pairs:

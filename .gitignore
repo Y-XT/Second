@@ -1,0 +1,24 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.ipynb_checkpoints/
+
+# Local tooling caches
+.codex
+.codex/
+.agents/
+
+# Editor settings
+.vscode/
+
+# OS metadata
+.DS_Store
+tools/__pycache__/evaluate_uavid2020.cpython-312.pyc
+tools/__pycache__/evaluate_uavid2020.cpython-312.pyc
+tools/__pycache__/pred_eval_uavula.cpython-312.pyc
+methods/networks/__pycache__/__init__.cpython-312.pyc
